@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Фаски">
+    <title>Расчёт токарных фасок</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <h1>Расчёт фаски</h1>
+            <span class="subtitle">Токарная обработка</span>
+        </header>
+
+        <main class="main">
+            <!-- Переключатели типа фаски -->
+            <section class="card">
+                <div class="toggle-group">
+                    <label class="toggle-label">Расположение</label>
+                    <div class="segmented" data-group="location">
+                        <button type="button" class="seg active" data-value="outer">Снаружи (вал)</button>
+                        <button type="button" class="seg" data-value="inner">Внутри (отверстие)</button>
+                    </div>
+                </div>
+
+                <div class="toggle-group">
+                    <label class="toggle-label">Угол отсчитывается от</label>
+                    <div class="segmented" data-group="angleFrom">
+                        <button type="button" class="seg active" data-value="axial">осевого катета (вдоль оси Z)</button>
+                        <button type="button" class="seg" data-value="radial">радиального катета (вдоль X)</button>
+                    </div>
+                    <p class="hint" id="angleHint">Пример: «фаска 2×45°» — угол обычно между поверхностью фаски и торцом (от осевого катета).</p>
+                </div>
+            </section>
+
+            <!-- Иллюстрация -->
+            <section class="card illustration-card">
+                <div class="svg-wrap">
+                    <svg id="illustration" viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" aria-label="Схема фаски"></svg>
+                </div>
+            </section>
+
+            <!-- Ввод параметров -->
+            <section class="card">
+                <div class="field">
+                    <label for="angle">Угол фаски, °</label>
+                    <div class="input-wrap">
+                        <input type="number" id="angle" inputmode="decimal" step="0.1" value="45" />
+                        <div class="quick-buttons">
+                            <button type="button" class="qbtn" data-angle="15">15°</button>
+                            <button type="button" class="qbtn" data-angle="30">30°</button>
+                            <button type="button" class="qbtn" data-angle="45">45°</button>
+                            <button type="button" class="qbtn" data-angle="60">60°</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>Что известно?</label>
+                    <div class="segmented" data-group="known">
+                        <button type="button" class="seg active" data-value="axial">Размер по Z (осевой)</button>
+                        <button type="button" class="seg" data-value="radial">Размер по X (радиальный)</button>
+                        <button type="button" class="seg" data-value="hyp">Длина фаски (гипотенуза)</button>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="knownValue" id="knownLabel">Значение, мм</label>
+                    <input type="number" id="knownValue" inputmode="decimal" step="0.01" value="2" />
+                </div>
+
+                <div class="field">
+                    <label for="diameter">Исходный диаметр D, мм <span class="opt">(необязательно)</span></label>
+                    <input type="number" id="diameter" inputmode="decimal" step="0.01" placeholder="например, 50" />
+                    <p class="hint">Если указан — покажем итоговый диаметр после фаски (D1 → D2).</p>
+                </div>
+            </section>
+
+            <!-- Результаты -->
+            <section class="card results-card">
+                <h2>Результаты</h2>
+                <div class="results" id="results"></div>
+            </section>
+
+            <section class="card info">
+                <details>
+                    <summary>Как это работает?</summary>
+                    <p>Фаска рассматривается как гипотенуза прямоугольного треугольника. Катеты — размеры вдоль оси Z (осевой) и по радиусу X.</p>
+                    <ul>
+                        <li><b>Угол от осевого катета</b> (обычно так и указывают на чертеже, например «2×45°»): <code>X = Z·tan(α)</code>, <code>Z = X/tan(α)</code>.</li>
+                        <li><b>Угол от радиального катета</b>: <code>Z = X·tan(α)</code>, <code>X = Z/tan(α)</code>.</li>
+                        <li>Радиальный катет X — это изменение <b>радиуса</b>. Изменение диаметра ΔD = 2·X.</li>
+                        <li>Для внешней фаски диаметр уменьшается (D2 = D1 − 2X), для внутренней — увеличивается (D2 = D1 + 2X).</li>
+                    </ul>
+                </details>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <span>Сделано для стойки Fanuc • PWA • offline-ready</span>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then((reg) => {
+                    // Если новый SW ждёт активации — попросим его применить обновление
+                    if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    reg.addEventListener('updatefound', () => {
+                        const nw = reg.installing;
+                        if (!nw) return;
+                        nw.addEventListener('statechange', () => {
+                            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                                nw.postMessage({ type: 'SKIP_WAITING' });
+                            }
+                        });
+                    });
+                }).catch((err) => {
+                    console.warn('SW registration failed:', err);
+                });
+
+                // Когда активный SW меняется — перезагружаем страницу, чтобы подтянуть свежий контент
+                let reloading = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (reloading) return;
+                    reloading = true;
+                    window.location.reload();
+                });
+            });
+        }
+    </script>
+</body>
+</html>
